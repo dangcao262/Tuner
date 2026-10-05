@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guitar Tuner</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E4EAE6;--ink:#1C2623;--mut:#5B6A64;--panel:#F3F6F4;--line:#BCC8C1;--wood:#4A2C2A;--wood2:#6A403A;--brass:#B8902F;--ok:#1F8A5B;--bad:#C2492F;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171A;--ink:#E7EEEA;--mut:#93A39B;--panel:#1C2328;--line:#2E3A40;--brass:#D8B24F;--ok:#3DCB8B;--bad:#F07A5E}}
+:root[data-theme="dark"]{--bg:#12171A;--ink:#E7EEEA;--mut:#93A39B;--panel:#1C2328;--line:#2E3A40;--brass:#D8B24F;--ok:#3DCB8B;--bad:#F07A5E}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,sans-serif;min-height:100vh}
+main{max-width:520px;margin:0 auto;padding:14px 12px 28px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px}
+button,select{font:inherit;color:inherit}
+.chip,.top select{background:var(--panel);border:1.5px solid var(--line);border-radius:999px;padding:9px 16px;cursor:pointer;font-weight:600}
+.chip[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.top select{padding-right:12px;max-width:190px}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+.stage{display:grid;grid-template-columns:92px minmax(150px,1fr) 92px;margin:14px 0 4px;align-items:start}
+.col{position:relative;aspect-ratio:92/440}
+.mid{aspect-ratio:300/440}
+.mid svg{width:100%;height:100%;display:block}
+.tn{position:absolute;transform:translateY(-50%);display:flex;align-items:center;gap:2px}
+.L .tn{right:2px;flex-direction:row}
+.R .tn{left:2px;flex-direction:row-reverse}
+.note{min-width:54px;height:46px;border-radius:12px;border:2px solid var(--line);background:var(--panel);font-weight:700;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.note small{font-size:.65rem;font-weight:600;color:var(--mut);margin-left:1px;align-self:flex-end;padding-bottom:9px}
+.note[aria-pressed="true"]{border-color:var(--brass);background:var(--brass);color:#1c1608}
+.note[aria-pressed="true"] small{color:#1c1608}
+.pick{width:24px;height:46px;appearance:none;-webkit-appearance:none;border:0;border-radius:8px;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2393A39B' stroke-width='2'/%3E%3C/svg%3E") center/12px no-repeat;color:transparent;cursor:pointer}
+.pick option{color:CanvasText;background:Canvas}
+.read{text-align:center;min-height:120px}
+.big{font-size:3.6rem;font-weight:700;line-height:1;margin-top:6px}
+.sub{color:var(--mut);margin-top:4px}
+.hint{font-weight:600;margin-top:6px;min-height:1.4em}
+.meter{position:relative;height:34px;margin:10px 6px 0;border-radius:10px;background:var(--panel);border:1.5px solid var(--line);overflow:hidden}
+.zone{position:absolute;left:45%;width:10%;top:0;bottom:0;background:color-mix(in srgb,var(--ok) 28%,transparent)}
+.tick{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+.needle{position:absolute;top:3px;bottom:3px;width:5px;margin-left:-2.5px;border-radius:3px;background:var(--mut);left:50%;transition:left .08s linear,background .15s}
+.needle.ok{background:var(--ok)}.needle.off{background:var(--bad)}
+.scale{display:flex;justify-content:space-between;margin:4px 8px 0;color:var(--mut);font-size:.8rem}
+.go{display:block;margin:22px auto 0;padding:14px 34px;font-size:1.05rem;border-radius:999px;border:0;background:var(--wood);color:#fff;font-weight:700;cursor:pointer}
+.go[aria-pressed="true"]{background:var(--bad)}
+.err{color:var(--bad);text-align:center;margin-top:10px;min-height:1.3em}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <button class="chip" id="auto" aria-pressed="false" title="Listen and guess which string you're playing">Auto</button>
+    <select id="tuning" aria-label="Tuning"></select>
+  </header>
+
+  <div class="stage">
+    <div class="col L" id="colL"></div>
+    <div class="mid" id="mid"></div>
+    <div class="col R" id="colR"></div>
+  </div>
+
+  <div class="read" aria-live="polite">
+    <div class="big" id="name">–</div>
+    <div class="sub" id="freq">Tap a note, then start listening</div>
+    <div class="hint" id="hint"></div>
+  </div>
+  <div class="meter"><div class="zone"></div><div class="tick" style="left:25%"></div><div class="tick" style="left:75%"></div><div class="needle" id="needle"></div></div>
+  <div class="scale"><span>flat</span><span>in tune</span><span>sharp</span></div>
+  <button class="go" id="go" aria-pressed="false">Start listening</button>
+  <div class="err" id="err"></div>
+</main>
+
+<script>
+const NN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const nm=m=>NN[m%12], oct=m=>Math.floor(m/12)-1, fr=m=>440*Math.pow(2,(m-69)/12);
+const TUNINGS={"Standard (EADGBE)":[40,45,50,55,59,64],"Drop D":[38,45,50,55,59,64],"Double drop D":[38,45,50,55,59,62],"Half step down":[39,44,49,54,58,63],"Full step down":[38,43,48,53,57,62],"DADGAD":[38,45,50,55,57,62],"Open G":[38,43,50,55,59,62],"Open D":[38,45,50,54,57,62]};
+// string index 0..5 = string 6..1. Position on headstock: side + y
+const POS=[['L',245],['L',170],['L',95],['R',95],['R',170],['R',245]];
+const NUT=[130,138,146,154,162,170];
+let notes=[...TUNINGS["Standard (EADGBE)"]], sel=0, auto=false, on=false;
+
+const $=id=>document.getElementById(id);
+const tuningEl=$('tuning');
+Object.keys(TUNINGS).forEach(k=>tuningEl.add(new Option(k,k)));
+const ph=new Option('Tuning','');ph.disabled=true;ph.hidden=true;tuningEl.add(ph,0);tuningEl.value='Standard (EADGBE)';
+
+// headstock svg
+let svg='<svg viewBox="0 0 300 440" role="img" aria-label="Guitar headstock">'
++'<path d="M118 440 L122 300 C92 280 72 200 80 110 C85 50 120 15 150 15 C180 15 215 50 220 110 C228 200 208 280 178 300 L182 440Z" fill="var(--wood)"/>'
++'<path d="M126 300 C100 270 90 200 94 120 C98 70 125 38 150 38" fill="none" stroke="var(--wood2)" stroke-width="3" opacity=".7"/>'
++'<rect x="122" y="312" width="56" height="8" rx="2" fill="#E9E2CF"/>';
+POS.forEach(([s,y],i)=>{const px=s=='L'?100:200,kx=s=='L'?66:234;
+ svg+=`<polyline id="s${i}" points="${px},${y} ${NUT[i]},320 ${NUT[i]},440" fill="none" stroke="#C9CFCB" stroke-width="2"/>`
+ +`<line x1="${kx}" y1="${y}" x2="${px}" y2="${y}" stroke="#B8B2A2" stroke-width="5" stroke-linecap="round"/>`
+ +`<circle cx="${px}" cy="${y}" r="7" fill="#D8D2C0"/><circle id="k${i}" cx="${kx}" cy="${y}" r="11" fill="var(--brass)"/>`;});
+$('mid').innerHTML=svg+'</svg>';
+
+// labels: note button + dropdown
+const range=[];for(let m=36;m<=76;m++)range.push(m);
+POS.forEach(([s,y],i)=>{
+ const d=document.createElement('div');d.className='tn';d.style.top=(y/440*100)+'%';
+ d.innerHTML=`<button class="note" id="b${i}" aria-pressed="false" aria-label="Tune string ${6-i}"></button>`
+ +`<select class="pick" id="p${i}" aria-label="Change note for string ${6-i}"></select>`;
+ $(s=='L'?'colL':'colR').appendChild(d);
+ const p=d.querySelector('select');range.forEach(m=>p.add(new Option(nm(m)+oct(m),m)));
+ d.querySelector('button').onclick=()=>{sel=i;setAuto(false);paint();};
+ p.onchange=()=>{notes[i]=+p.value;sel=i;const k=Object.keys(TUNINGS).find(n=>TUNINGS[n].join()==notes.join());tuningEl.value=k||'';paint();};
+});
+tuningEl.onchange=()=>{if(TUNINGS[tuningEl.value]){notes=[...TUNINGS[tuningEl.value]];paint();}};
+
+function paint(){
+ notes.forEach((m,i)=>{
+  const b=$('b'+i);b.innerHTML=nm(m)+'<small>'+oct(m)+'</small>';
+  b.setAttribute('aria-pressed',i==sel);$('p'+i).value=m;
+  $('s'+i).setAttribute('stroke',i==sel?'var(--brass)':'#C9CFCB');
+  $('s'+i).setAttribute('stroke-width',i==sel?3.5:2);
+ });
+}
+function setAuto(v){auto=v;$('auto').setAttribute('aria-pressed',v);}
+$('auto').onclick=()=>{setAuto(!auto);if(auto&&!on)start();};
+$('go').onclick=()=>on?stop():start();
+paint();
+
+// audio
+let ac,an,stream,raf,buf,hist=[],last=0;
+async function start(){
+ $('err').textContent='';
+ try{
+  stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+ }catch(e){$('err').textContent='Microphone blocked. Allow mic access for this page (it needs HTTPS) and try again.';return;}
+ ac=new (window.AudioContext||window.webkitAudioContext)();await ac.resume();
+ an=ac.createAnalyser();an.fftSize=4096;ac.createMediaStreamSource(stream).connect(an);
+ buf=new Float32Array(an.fftSize);on=true;hist=[];
+ $('go').textContent='Stop listening';$('go').setAttribute('aria-pressed',true);
+ $('freq').textContent='Listening… pluck a string';
+ raf=requestAnimationFrame(loop);
+}
+function stop(){
+ on=false;cancelAnimationFrame(raf);stream&&stream.getTracks().forEach(t=>t.stop());ac&&ac.close();
+ $('go').textContent='Start listening';$('go').setAttribute('aria-pressed',false);
+ $('name').textContent='–';$('freq').textContent='Tap a note, then start listening';$('hint').textContent='';
+ $('needle').style.left='50%';$('needle').className='needle';
+}
+function yin(b,sr){
+ const W=2048,M=1100,d=new Float32Array(M);
+ for(let t=1;t<M;t++){let s=0;for(let j=0;j<W;j++){const x=b[j]-b[j+t];s+=x*x;}d[t]=s;}
+ let run=0;d[0]=1;for(let t=1;t<M;t++){run+=d[t];d[t]=run?d[t]*t/run:1;}
+ let t=Math.floor(sr/1000);
+ for(;t<M-1;t++){if(d[t]<0.15){while(t+1<M-1&&d[t+1]<d[t])t++;break;}}
+ if(t>=M-1)return -1;
+ const a=d[t-1],c=d[t+1],b0=d[t],den=a+c-2*b0,sh=den?(a-c)/(2*den):0;
+ return sr/(t+sh);
+}
+function loop(ts){
+ raf=requestAnimationFrame(loop);
+ if(ts-last<40)return;last=ts;
+ an.getFloatTimeDomainData(buf);
+ let r=0;for(let i=0;i<2048;i++)r+=buf[i]*buf[i];r=Math.sqrt(r/2048);
+ const needle=$('needle');
+ if(r<0.01){hist=[];return;}
+ const f=yin(buf,ac.sampleRate);if(f<40||f>1400)return;
+ hist.push(f);if(hist.length>5)hist.shift();
+ const fm=[...hist].sort((a,b)=>a-b)[hist.length>>1];
+ if(auto){let best=1e9;notes.forEach((m,i)=>{const c=Math.abs(1200*Math.log2(fm/fr(m)));if(c<best){best=c;sel=i;}});paint();}
+ const cents=1200*Math.log2(fm/fr(notes[sel]));
+ const dm=Math.round(69+12*Math.log2(fm/440));
+ $('name').textContent=nm(dm)+oct(dm);
+ $('freq').textContent=fm.toFixed(1)+' Hz · target '+nm(notes[sel])+oct(notes[sel])+' · '+(cents>0?'+':'')+cents.toFixed(0)+' cents';
+ const c=Math.max(-50,Math.min(50,cents)),ok=Math.abs(cents)<=5;
+ needle.style.left=(50+c)+'%';needle.className='needle '+(ok?'ok':Math.abs(cents)>20?'off':'');
+ $('hint').textContent=ok?'In tune':cents<0?'Too low – tighten the string':'Too high – loosen the string';
+}
+</script>
+</body>
+</html>
